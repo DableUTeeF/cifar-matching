@@ -9,8 +9,18 @@ class MatchingCifarLoader:
     DataLoader(testset, batch_size=100, shuffle=False, num_workers=0)
     """
     def __init__(self, root):
-        self.trainset = self.DataSet(CIFAR10(root=root, train=True, download=True), 50000)
-        self.testset = self.DataSet(CIFAR10(root=root, train=False, download=True), 10000)
+        self.trainset = self.DataSet(CIFAR10(root=root, train=True, download=True),
+                                     50000,
+                                     images_per_cls=10,
+                                     use_all=False,
+                                     mode='train'
+                                     )
+        self.testset = self.DataSet(CIFAR10(root=root, train=False, download=True),
+                                    10000,
+                                    images_per_cls=10,
+                                    use_all=False,
+                                    mode='test'
+                                    )
 
     def get_trainset(self, batch_size, num_worker, shuffle=True):
         return DataLoader(self.trainset,
@@ -25,10 +35,13 @@ class MatchingCifarLoader:
                           num_workers=num_worker)
 
     class DataSet:
-        def __init__(self, dset, set_length, use_all=False):
+        def __init__(self, dset, set_length, images_per_cls=1, use_all=False, mode=None):
+            assert (mode in ['train', 'test']) ^ use_all, r'Mode should be either "train" or "test" if not use all classes'
             self.dset = dset
             self.set_length = set_length
+            self.images_per_cls = images_per_cls
             self.use_all = use_all
+            self.mode = mode
 
         def __len__(self):
             return self.set_length // 2
@@ -41,11 +54,12 @@ class MatchingCifarLoader:
                 c = 5
             else:
                 c = 10
-            x_support = np.zeros((c, 32, 32, 3), dtype='uint8')
-            y_support = np.zeros((c, c), dtype='uint8')
+            # support set
+            x_support = np.zeros((c, self.images_per_cls, 32, 32, 3), dtype='uint8')
+            y_support = np.zeros((c, self.images_per_cls, c), dtype='uint8')
             selected_idxs = []
             for i in range(5):
-                if self.set_length < 20000:
+                if self.mode == 'test':
                     """
                     Separate between train and test set.
                     Train set will return only first 5 classes, else for test set.
@@ -62,12 +76,17 @@ class MatchingCifarLoader:
                     y -= 5
                 x_support[i] = np.array(x, dtype='uint8')
                 y_support[i, y] = 1
+            s = x_support.shape
+            x_support = np.reshape(x_support, (s[0]*s[1], s[2], s[3], s[4]))
+            s = y_support.shape
+            y_support = np.reshape(y_support, (s[0]*s[1], s[2]))
 
+            # target set
             if self.use_all:
                 r = range(10)
                 s = 0  # use for subtract y target
             else:
-                if self.set_length < 20000:
+                if self.mode == 'test':
                     r = range(5, 10)
                     s = 5
                 else:
