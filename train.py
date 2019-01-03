@@ -22,11 +22,11 @@ name = 'cifar10'
 data = MatchingCifarLoader(os.path.join(rootpath, name))
 obj_oneShotBuilder = Builder(data, 'sgd', 1e-2)
 try:
-    length = os.listdir(f'log/{name}/')
+    length = len(os.listdir(f'log/{name}/'))
 except FileNotFoundError:
     length = 0
 logger = utils.Logger(f'log/{name}/{length}')
-logger.text_summary('Describe', 'sgd: 1e-2, 32', 0)
+logger.text_summary('Describe', '5 cls, sgd: 1e-2, 32', 0)
 for e in range(total_epochs):
     total_c_loss, total_accuracy = obj_oneShotBuilder.run_training_epoch(batch_size, 2)
     print("Epoch {}: train_loss:{} train_accuracy:{}".format(e, total_c_loss, total_accuracy))

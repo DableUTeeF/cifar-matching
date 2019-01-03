@@ -2,7 +2,6 @@ import matching_networks
 from torch.nn import functional as F
 import torch
 import tqdm
-from math import ceil
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 
@@ -14,7 +13,7 @@ class Builder:
         :param data:
         """
         self.data = data
-        self.classes_per_set = 10
+        self.classes_per_set = 5
         self.lr = lr
         self.image_size = (32, 32)
         self.optim = optim
