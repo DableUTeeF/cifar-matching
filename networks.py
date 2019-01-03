@@ -18,7 +18,8 @@ class Builder:
         self.image_size = (32, 32)
         self.optim = optim
         self.wd = 1e-6
-        self.g = matching_networks.Classifier(num_channels=3)
+        # self.g = matching_networks.Classifier(num_channels=3)
+        self.g = matching_networks.ResNet()
         self.dn = matching_networks.DistanceNetwork()
         self.classify = matching_networks.AttentionalClassify()
         # self.g_lstm = matching_networks.BidirectionalLSTM(1, batch_size, 256, True)
