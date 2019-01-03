@@ -59,23 +59,24 @@ class MatchingCifarLoader:
             y_support = np.zeros((c, self.images_per_cls, c), dtype='uint8')
             selected_idxs = []
             for i in range(5):
-                if self.mode == 'test':
-                    """
-                    Separate between train and test set.
-                    Train set will return only first 5 classes, else for test set.
-                    """
-                    j = i + 5
-                else:
-                    j = i
-                randomed_idx = np.random.randint(0, self.set_length-1)
-                while randomed_idx in selected_idxs or self.dset[randomed_idx][1] != j:
+                for k in range(self.images_per_cls):
+                    if self.mode == 'test':
+                        """
+                        Separate between train and test set.
+                        Train set will return only first 5 classes, else for test set.
+                        """
+                        j = i + 5
+                    else:
+                        j = i
                     randomed_idx = np.random.randint(0, self.set_length-1)
-                selected_idxs.append(randomed_idx)
-                x, y = self.dset[randomed_idx]
-                if not self.use_all and y > 4:
-                    y -= 5
-                x_support[i] = np.array(x, dtype='uint8')
-                y_support[i, y] = 1
+                    while randomed_idx in selected_idxs or self.dset[randomed_idx][1] != j:
+                        randomed_idx = np.random.randint(0, self.set_length-1)
+                    selected_idxs.append(randomed_idx)
+                    x, y = self.dset[randomed_idx]
+                    if not self.use_all and y > 4:
+                        y -= 5
+                    x_support[i, k] = np.array(x, dtype='uint8')
+                    y_support[i, k, y] = 1
             s = x_support.shape
             x_support = np.reshape(x_support, (s[0]*s[1], s[2], s[3], s[4]))
             s = y_support.shape

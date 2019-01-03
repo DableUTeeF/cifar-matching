@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
-import math
 import numpy as np
 import torch.nn.functional as F
 from torch.autograd import Variable
-import subprocess
 
 
 class ConvBlock(nn.Module):
@@ -52,7 +50,7 @@ class Classifier(nn.Module):
         :param keep_prob:
         :param image_size:
         """
-        self.conv1 = ConvBlock(num_channels, 32, True, stride=2)
+        self.conv1 = ConvBlock(num_channels, 32, True, stride=1)
         self.res1 = ResBlock(32, 64)
         self.res2 = ResBlock(64, 128)
         self.res3 = ResBlock(128, 256)
@@ -201,12 +199,7 @@ class MatchingNetwork(nn.Module):
         # produce embeddings for support set images
         encoded_images = []
         for i in np.arange(support_set_images.size(1)):
-            try:
-                output = subprocess.Popen(['nvidia-smi'], stdout=subprocess.PIPE).communicate()[0]
-                gen_encode = self.g(support_set_images[:, i, :, :])
-            except RuntimeError as e:
-                print(output)
-                raise RuntimeError(e)
+            gen_encode = self.g(support_set_images[:, i, :, :])
             encoded_images.append(gen_encode.cpu())
 
         # produce embeddings for target images
