@@ -169,9 +169,9 @@ class DistanceNetwork(nn.Module):
         return similarities.t()
 
 
-class BidirectionalLSTM(nn.Module):
+class g_BidirectionalLSTM(nn.Module):
     def __init__(self, layer_size, batch_size, vector_dim, use_cuda):
-        super(BidirectionalLSTM, self).__init__()
+        super(g_BidirectionalLSTM, self).__init__()
         """
         Initial a muti-layer Bidirectional LSTM
         :param layer_size: a list of each layer'size
@@ -204,6 +204,67 @@ class BidirectionalLSTM(nn.Module):
 
     def forward(self, inputs):
         # self.hidden = self.init_hidden(self.use_cuda)
+        # self.hidden = self.repackage_hidden(self.hidden)
+        output, self.hidden = self.lstm(inputs, self.hidden)
+        return output
+
+
+class f_BidirectionalLSTM(nn.Module):
+    def __init__(self, layer_size, batch_size, vector_dim, use_cuda):
+        super(f_BidirectionalLSTM, self).__init__()
+        self.batch_size = batch_size
+        self.hidden_size = layer_size[0]
+        self.vector_dim = vector_dim
+        self.num_layer = len(layer_size)
+        self.use_cuda = use_cuda
+        self.lstm = nn.LSTM(input_size=self.vector_dim, num_layers=self.num_layer, hidden_size=self.hidden_size,
+                            bidirectional=False)
+        self.hidden = self.init_hidden(self.use_cuda)
+        self.attentional_softmax = torch.ones((batch_size, 10)) * 1./10
+
+    def init_hidden(self, use_cuda):
+        if use_cuda:
+            return (Variable(torch.zeros(self.lstm.num_layers * 2, self.batch_size, self.lstm.hidden_size), requires_grad=False).cuda(),
+                    Variable(torch.zeros(self.lstm.num_layers * 2, self.batch_size, self.lstm.hidden_size), requires_grad=False).cuda())
+        else:
+            return (Variable(torch.zeros(self.lstm.num_layers * 2, self.batch_size, self.lstm.hidden_size), requires_grad=False),
+                    Variable(torch.zeros(self.lstm.num_layers * 2, self.batch_size, self.lstm.hidden_size), requires_grad=False))
+
+    def repackage_hidden(self, h):
+        """Wraps hidden states in new Variables, to detach them from their history."""
+        if type(h) == Variable:
+            return Variable(h.data)
+        else:
+            return tuple(self.repackage_hidden(v) for v in h)
+
+    def forward(self, inputs):
+        """"""
+        '''
+        def __call__(self, support_set_embeddings, target_set_embeddings, K, training=False):
+            b, k, h_g_dim = support_set_embeddings.get_shape().as_list()
+            b, h_f_dim = target_set_embeddings.get_shape().as_list()
+            with tf.variable_scope(self.name, reuse=self.reuse):
+                fw_lstm_cells_encoder = rnn.LSTMCell(num_units=self.layer_size, activation=tf.nn.tanh)
+                attentional_softmax = tf.ones(shape=(b, k)) * (1.0/k)
+                h = tf.zeros(shape=(b, h_g_dim))
+                c_h = (h, h)
+                c_h = (c_h[0], c_h[1] + target_set_embeddings)
+                for i in range(K):
+                    attentional_softmax = tf.expand_dims(attentional_softmax, axis=2)
+                    attented_features = support_set_embeddings * attentional_softmax
+                    attented_features_summed = tf.reduce_sum(attented_features, axis=1)
+                    c_h = (c_h[0], c_h[1] + attented_features_summed)
+                    x, h_c = fw_lstm_cells_encoder(inputs=target_set_embeddings, state=c_h)
+                    attentional_softmax = tf.layers.dense(x, units=k, activation=tf.nn.softmax, reuse=self.reuse)
+                    self.reuse = True
+    
+            outputs = x
+            print("out shape", tf.stack(outputs, axis=0).get_shape().as_list())
+            self.reuse = True
+            self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
+            print(self.variables)
+            return outputs
+        '''
         self.hidden = self.repackage_hidden(self.hidden)
         output, self.hidden = self.lstm(inputs, self.hidden)
         return output
@@ -236,8 +297,6 @@ class MatchingNetwork(nn.Module):
         self.g = Classifier(num_channels=num_channels)
         self.dn = DistanceNetwork()
         self.classify = AttentionalClassify()
-        if self.fce:
-            self.lstm = BidirectionalLSTM(layer_size=[32], batch_size=self.batch_size, vector_dim=self.g.outSize, use_cuda=use_cuda)
 
     def train(self, mode=True):
         super().train(mode)

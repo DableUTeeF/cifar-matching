@@ -4,6 +4,8 @@ import torch
 import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
+from torch.backends import cudnn
+cudnn.benchmark = True
 
 
 class Builder:
@@ -22,7 +24,8 @@ class Builder:
         self.g = matching_networks.ResNet()
         self.dn = matching_networks.DistanceNetwork()
         self.classify = matching_networks.AttentionalClassify()
-        # self.g_lstm = matching_networks.BidirectionalLSTM(1, batch_size, 256, True)
+        self.g_lstm = matching_networks.g_BidirectionalLSTM((32, 32, 32), 32, 1024, True).cuda()
+        # self.f_lstm = matching_networks.f_BidirectionalLSTM((256, ), 32, 1024, True)
         # self.matchNet = MatchingNetwork(keep_prob, batch_size, num_channels, self.lr, fce, classes_per_set,
         #                                 samples_per_class, image_size, self.isCuadAvailable & self.use_cuda)
         self.total_iter = 0
@@ -70,11 +73,13 @@ class Builder:
         with torch.no_grad():
             for j in np.arange(x_support_set.size(1)):
                 try:
-                    gen_encode = self.g(x_support_set[:, j, :, :].cuda()).cpu()
+                    gen_encode = self.g(x_support_set[:, j, :, :].cuda())
+                    gen_encode = self.g_lstm(gen_encode.unsqueeze(0)).squeeze(0).cpu()
                 except RuntimeError as e:
                     raise RuntimeError(f'j={j}: {e}')
                 encoded_images.append(gen_encode.cpu())
         gen_encode = self.g(x_target.cuda())
+        gen_encode = self.g_lstm(gen_encode.unsqueeze(0)).squeeze(0).cpu()
         encoded_images.append(gen_encode.cpu())
         output = torch.stack(encoded_images)
         similarites = self.dn(support_set=output[:-1], input_image=output[-1])
