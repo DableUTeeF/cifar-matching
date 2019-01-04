@@ -42,6 +42,11 @@ class MatchingCifarLoader:
             self.images_per_cls = images_per_cls
             self.use_all = use_all
             self.mode = mode
+            self.curidx = 0
+
+        def __next__(self):
+            self.curidx += 1
+            return self[self.curidx-1]
 
         def __len__(self):
             return self.set_length // 2

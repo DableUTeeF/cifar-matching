@@ -6,6 +6,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 from torch.backends import cudnn
 cudnn.benchmark = True
+from keras.utils import data_utils
+from torch.autograd import Variable
 
 
 class Builder:
@@ -124,5 +126,65 @@ class Builder:
 
             total_c_loss = total_c_loss / total_val_batches
             total_accuracy = total_accuracy / total_val_batches
-            self.scheduler.step(total_c_loss)
+            # self.scheduler.step(total_c_loss)
             return total_c_loss, total_accuracy
+
+    def train_generator(self, batch_size, num_worker):
+        total_c_loss = 0.0
+        total_accuracy = 0.0
+        # optimizer = self._create_optimizer(self.matchNet, self.lr)
+        # traindata = self.data.get_trainset(batch_size, 0, shuffle=True)
+        traindata = self.data.trainset
+        train_enqueuer = data_utils.GeneratorEnqueuer(traindata)
+        train_enqueuer.start(workers=num_worker, max_queue_size=batch_size*2)
+        train_generator = train_enqueuer.get()
+        total_train_batches = len(traindata)
+        with tqdm.tqdm(total=total_train_batches) as pbar:
+            for i in range(total_train_batches):
+                # (x_support_set, y_support_set, x_target, y_target) = next(train_generator)
+                batch = []
+                for b in range(batch_size):
+                    batch.append(next(train_generator))
+                x_support_set, y_support_set, x_target, y_target = self.numpy2tensor(batch)
+                x_support_set = x_support_set.permute(0, 1, 4, 2, 3)
+                x_target = x_target.permute(0, 3, 1, 2)
+                y_support_set = y_support_set.float()
+                y_target = y_target.long()
+                x_support_set = x_support_set.float()
+                x_target = x_target.float()
+                acc, c_loss = self.matchNet(x_support_set, y_support_set, x_target, y_target)
+
+                # optimize process
+                self.optimizer.zero_grad()
+                c_loss.backward()
+                self.optimizer.step()
+
+                total_c_loss += c_loss.data[0]
+                total_accuracy += acc.data[0]
+                iter_out = f"loss: {total_c_loss / i:.{3}}, acc: {total_accuracy / i:.{3}}"
+                pbar.set_description(iter_out)
+                pbar.update(1)
+                # self.total_train_iter+=1
+
+            self.scheduler.step(total_accuracy)
+            total_c_loss = total_c_loss / total_train_batches
+            total_accuracy = total_accuracy / total_train_batches
+            return total_c_loss, total_accuracy
+
+    def numpy2tensor(self, batch):
+        batch_size = len(batch)
+        x_s = np.zeros((batch_size, self.classes_per_set * 10, 32, 32, 3))
+        x_t = np.zeros((batch_size, 32, 32, 3))
+        y_s = np.zeros((batch_size, self.classes_per_set * 10, self.classes_per_set))
+        y_t = np.zeros((batch_size,))
+        for b in range(batch_size):
+            x_support_set, y_support_set, x_target, y_target = batch[b]
+            x_s[b] = x_support_set
+            y_s[b] = y_support_set
+            x_t[b] = x_target
+            y_t[b] = y_target
+        x_s = Variable(torch.from_numpy(x_s)).float()
+        y_s = Variable(torch.from_numpy(y_s), requires_grad=False).long()
+        x_t = Variable(torch.from_numpy(x_t)).float()
+        y_t = Variable(torch.from_numpy(y_t), requires_grad=False).long()
+        return x_s, y_s, x_t, y_t
